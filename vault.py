@@ -230,3 +230,20 @@ def cmd_list(project: str = None):
         print(f"  {'PROJECT':<24} {'KEYS':>5}  {'LAST UPDATED'}\n  {'─'*55}")
         for r in rows:
             print(f"  {CY}{r['project']:<24}{R} {r['cnt']:>5}  {DM}{r['latest']}{R}")
+
+    print()
+
+
+def cmd_delete(project: str, key_name: str):
+    banner()
+    meta = load_meta()
+    key  = verify_password(meta)
+    conn = get_conn()
+    cursor = conn.execute(
+        "DELETE FROM keys WHERE project=? AND key_name=?", (project, key_name)
+    )
+    conn.commit(); conn.close()
+    if cursor.rowcount == 0:
+        err(f"Key '{project}/{key_name}' not found.")
+    ok(f"Deleted {CY}{project}/{key_name}{R}")
+    print()
