@@ -89,3 +89,144 @@ def verify_password(meta: dict) -> bytes:
     except Exception:
         err("Wrong password.")
     return key
+
+# ── DB helpers ─────────────────────────────────────────────────────────────────
+def get_conn():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS keys (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            project   TEXT NOT NULL,
+            key_name  TEXT NOT NULL,
+            value_enc TEXT NOT NULL,
+            created   TEXT NOT NULL,
+            updated   TEXT NOT NULL,
+            UNIQUE(project, key_name)
+        )
+    """)
+    conn.commit()
+    return conn
+
+def now_str():
+    return datetime.now().strftime("%Y-%m-%d %H:%M")
+
+# ── Commands ───────────────────────────────────────────────────────────────────
+
+def cmd_init():
+    banner()
+    if VAULT_DIR.exists() and META_PATH.exists():
+        warn("Vault already exists.")
+        confirm = input(f"  {YL}Re-initialize? This will ERASE all data. (yes/no):{R} ").strip()
+        if confirm.lower() != "yes":
+            info("Aborted.")
+            return
+        shutil.rmtree(VAULT_DIR)
+
+    VAULT_DIR.mkdir(mode=0o700, exist_ok=True)
+
+    print(f"  {CY}Choose a strong master password (it will never be stored).{R}")
+    while True:
+        pw1 = getpass.getpass(f"  {CY}New master password:{R} ")
+        pw2 = getpass.getpass(f"  {CY}Confirm password:{R}    ")
+        if pw1 != pw2:
+            warn("Passwords don't match. Try again.")
+            continue
+        if len(pw1) < 8:
+            warn("Password must be at least 8 characters.")
+            continue
+        break
+
+    salt = secrets.token_bytes(32)
+    key  = derive_key(pw1, salt)
+    canary = encrypt("vault-canary-ok", key)
+
+    meta = {
+        "version":    1,
+        "salt":       base64.b64encode(salt).decode(),
+        "canary":     canary,
+        "iterations": ITERATIONS,
+        "created":    now_str(),
+    }
+    save_meta(meta)
+    # Create DB
+    conn = get_conn(); conn.close()
+    # Lock down permissions
+    DB_PATH.chmod(0o600)
+    META_PATH.chmod(0o600)
+
+    ok("Vault initialized successfully!")
+    info(f"Vault location: {VAULT_DIR}")
+    print()
+
+
+def cmd_add(project: str, key_name: str):
+    banner()
+    meta = load_meta()
+    key  = verify_password(meta)
+    value = getpass.getpass(f"  {CY}Value for {B}{project}/{key_name}{R}{CY}:{R} ")
+    if not value.strip():
+        err("Value cannot be empty.")
+
+    enc = encrypt(value, key)
+    conn = get_conn()
+    ts = now_str()
+    conn.execute("""
+        INSERT INTO keys (project, key_name, value_enc, created, updated)
+        VALUES (?,?,?,?,?)
+        ON CONFLICT(project, key_name) DO UPDATE
+          SET value_enc=excluded.value_enc, updated=excluded.updated
+    """, (project, key_name, enc, ts, ts))
+    conn.commit(); conn.close()
+    ok(f"Saved {CY}{project}/{key_name}{R}")
+    print()
+
+
+def cmd_get(project: str, key_name: str):
+    banner()
+    meta = load_meta()
+    key  = verify_password(meta)
+    conn = get_conn()
+    row  = conn.execute(
+        "SELECT value_enc, updated FROM keys WHERE project=? AND key_name=?",
+        (project, key_name)
+    ).fetchone()
+    conn.close()
+    if not row:
+        err(f"Key '{project}/{key_name}' not found.")
+
+    value = decrypt(row["value_enc"], key)
+    print(f"\n  {B}Project:{R}  {CY}{project}{R}")
+    print(f"  {B}Key:{R}      {CY}{key_name}{R}")
+    print(f"  {B}Value:{R}    {GR}{value}{R}")
+    print(f"  {B}Updated:{R}  {DM}{row['updated']}{R}\n")
+
+
+def cmd_list(project: str = None):
+    banner()
+    meta = load_meta()
+    # No password needed — just shows project/key names (not values)
+    conn = get_conn()
+    if project:
+        rows = conn.execute(
+            "SELECT key_name, updated FROM keys WHERE project=? ORDER BY key_name",
+            (project,)
+        ).fetchall()
+        conn.close()
+        if not rows:
+            warn(f"No keys found for project '{project}'.")
+            return
+        print(f"  {B}{CY}{project}{R}\n")
+        for r in rows:
+            print(f"    {GR}•{R} {r['key_name']:<30} {DM}{r['updated']}{R}")
+    else:
+        rows = conn.execute(
+            "SELECT project, COUNT(*) as cnt, MAX(updated) as latest FROM keys GROUP BY project ORDER BY project"
+        ).fetchall()
+        conn.close()
+        if not rows:
+            warn("Vault is empty. Add keys with: python vault.py add <project> <key_name>")
+            return
+        print(f"  {'PROJECT':<24} {'KEYS':>5}  {'LAST UPDATED'}\n  {'─'*55}")
+        for r in rows:
+            print(f"  {CY}{r['project']:<24}{R} {r['cnt']:>5}  {DM}{r['latest']}{R}")
