@@ -287,7 +287,39 @@ def cmd_export(project: str):
     print()
 
 
+def cmd_change_password():
+    banner()
+    meta = load_meta()
+    old_key = verify_password(meta)
 
+    # Load all secrets with old key
+    conn = get_conn()
+    rows = conn.execute("SELECT id, value_enc FROM keys").fetchall()
+
+    print(f"\n  {CY}Choose a new master password.{R}")
+    while True:
+        pw1 = getpass.getpass(f"  {CY}New master password:{R} ")
+        pw2 = getpass.getpass(f"  {CY}Confirm:{R}            ")
+        if pw1 != pw2:   warn("Passwords don't match."); continue
+        if len(pw1) < 8: warn("Must be at least 8 chars."); continue
+        break
+
+    new_salt = secrets.token_bytes(32)
+    new_key  = derive_key(pw1, new_salt)
+
+    # Re-encrypt everything
+    for r in rows:
+        plaintext = decrypt(r["value_enc"], old_key)
+        new_enc   = encrypt(plaintext, new_key)
+        conn.execute("UPDATE keys SET value_enc=? WHERE id=?", (new_enc, r["id"]))
+    conn.commit(); conn.close()
+
+    # Update meta
+    meta["salt"]   = base64.b64encode(new_salt).decode()
+    meta["canary"] = encrypt("vault-canary-ok", new_key)
+    save_meta(meta)
+    ok(f"Password changed. {len(rows)} key(s) re-encrypted.")
+    print()
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────
