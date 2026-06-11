@@ -247,3 +247,80 @@ def cmd_delete(project: str, key_name: str):
         err(f"Key '{project}/{key_name}' not found.")
     ok(f"Deleted {CY}{project}/{key_name}{R}")
     print()
+
+def cmd_nuke(project: str):
+    banner()
+    meta = load_meta()
+    verify_password(meta)
+    confirm = input(f"  {RD}Delete ALL keys in '{project}'? (yes/no):{R} ").strip()
+    if confirm.lower() != "yes":
+        info("Aborted."); return
+    conn = get_conn()
+    cursor = conn.execute("DELETE FROM keys WHERE project=?", (project,))
+    conn.commit(); conn.close()
+    ok(f"Deleted {cursor.rowcount} key(s) from project '{project}'")
+    print()
+
+
+def cmd_export(project: str):
+    banner()
+    meta = load_meta()
+    key  = verify_password(meta)
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT key_name, value_enc FROM keys WHERE project=? ORDER BY key_name",
+        (project,)
+    ).fetchall()
+    conn.close()
+    if not rows:
+        err(f"No keys found for project '{project}'.")
+
+    out_path = Path(f"{project}.env")
+    with open(out_path, "w") as f:
+        f.write(f"# {project} — exported from API Key Vault on {now_str()}\n")
+        for r in rows:
+            value = decrypt(r["value_enc"], key)
+            f.write(f"{r['key_name']}={value}\n")
+    out_path.chmod(0o600)
+    ok(f"Exported to {GR}{out_path}{R} ({len(rows)} keys)")
+    warn("Add this file to .gitignore immediately!")
+    print()
+
+
+
+
+
+# ── Entry point ────────────────────────────────────────────────────────────────
+def main():
+    args = sys.argv[1:]
+    if not args:
+        banner()
+        print(__doc__)
+        return
+
+    cmd = args[0].lower()
+
+    if cmd == "init":
+        cmd_init()
+    elif cmd == "add" and len(args) == 3:
+        cmd_add(args[1], args[2])
+    elif cmd == "get" and len(args) == 3:
+        cmd_get(args[1], args[2])
+    elif cmd == "list" and len(args) == 1:
+        cmd_list()
+    elif cmd == "list" and len(args) == 2:
+        cmd_list(args[1])
+    elif cmd == "delete" and len(args) == 3:
+        cmd_delete(args[1], args[2])
+    elif cmd == "nuke" and len(args) == 2:
+        cmd_nuke(args[1])
+    elif cmd == "export" and len(args) == 2:
+        cmd_export(args[1])
+    elif cmd == "change-password" and len(args) == 1:
+        cmd_change_password()
+    else:
+        banner()
+        print(__doc__)
+
+if __name__ == "__main__":
+    main()
