@@ -1,1 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>API Key Vault </title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Bebas+Neue&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:       #060810;
+      --panel:    #0C0E1A;
+      --panel2:   #101322;
+      --border:   #1C2035;
+      --border2:  #252A45;
+      --text:     #C8D0E8;
+      --muted:    #4A5278;
+      --muted2:   #6B75A0;
+      --green:    #00E676;
+      --yellow:   #FFD740;
+      --red:      #FF5252;
+      --blue:     #40C4FF;
+      --purple:   #CE93D8;
+      --font:     'IBM Plex Mono', monospace;
+      --display:  'Bebas Neue', sans-serif;
+    }
 
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* scanline overlay */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.07) 2px,
+        rgba(0,0,0,0.07) 4px
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    /* ── LAYOUT ── */
+    .shell {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 48px 32px 64px;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 24px;
+      margin-bottom: 48px;
+      padding-bottom: 40px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .day-chip {
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: var(--muted2);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .day-chip::before {
+      content: '';
+      width: 24px; height: 1px;
+      background: var(--muted);
+    }
+
+    h1 {
+      font-family: var(--display);
+      font-size: clamp(52px, 7vw, 96px);
+      line-height: 0.9;
+      letter-spacing: 1px;
+      color: #fff;
+    }
+
+    h1 span {
+      color: var(--green);
+      -webkit-text-stroke: 0px;
+    }
+
+    .hero-desc {
+      margin-top: 16px;
+      color: var(--muted2);
+      font-size: 13px;
+      line-height: 1.7;
+      max-width: 520px;
+    }
+
+    /* Security badge */
+    .sec-badge {
+      background: var(--panel);
+      border: 1px solid var(--border2);
+      border-radius: 16px;
+      padding: 24px 28px;
+      text-align: center;
+      min-width: 180px;
+    }
+
+    .lock-icon {
+      font-size: 40px;
+      margin-bottom: 8px;
+      display: block;
+      animation: breathe 3s ease-in-out infinite;
+    }
+
+    .sec-title {
+      font-family: var(--display);
+      font-size: 28px;
+      color: var(--green);
+      letter-spacing: 1px;
+    }
+
+    .sec-sub {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 2px;
+      margin-top: 4px;
+    }
+
+    /* ── TERMINAL DEMO ── */
+    .section-label {
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .terminal {
+      background: #05060E;
+      border: 1px solid var(--border2);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 40px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
+    }
+
+    .term-bar {
+      background: var(--panel);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.r { background: #FF5F57; }
+    .dot.y { background: #FFBD2E; }
+    .dot.g { background: #28CA42; }
+
+    .term-title {
+      flex: 1;
+      text-align: center;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .term-body {
+      padding: 24px 28px;
+      font-size: 13px;
+      line-height: 2;
+    }
+
+    /* Active command tabs */
+    .cmd-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .cmd-tab {
+      background: var(--panel);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      padding: 5px 14px;
+      font-family: var(--font);
+      font-size: 11px;
+      color: var(--muted2);
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .cmd-tab:hover, .cmd-tab.active {
+      background: var(--border2);
+      color: var(--green);
+      border-color: var(--green);
+    }
+
+    /* Terminal output lines */
+    .t-prompt::before {
+      content: '$ ';
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .t-prompt { color: var(--text); }
+    .t-out    { color: var(--muted2); padding-left: 2px; }
+    .t-ok     { color: var(--green); }
+    .t-warn   { color: var(--yellow); }
+    .t-err    { color: var(--red); }
+    .t-key    { color: var(--blue); }
+    .t-val    { color: var(--purple); }
+    .t-dim    { color: var(--muted); }
+    .t-blank  { line-height: 0.8; }
+
+    .cursor {
+      display: inline-block;
+      width: 8px; height: 14px;
+      background: var(--green);
+      vertical-align: middle;
+      animation: blink 1s step-end infinite;
+    }
+
+    /* ── SECURITY TABLE ── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+
+    @media(max-width: 700px) { .two-col { grid-template-columns: 1fr; } .hero { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+
+    .card-head {
+      font-family: var(--display);
+      font-size: 22px;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+      color: #fff;
+    }
+
+    .sec-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+
+    .sec-row:last-child { border-bottom: none; }
+
+    .sec-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+    .sec-key { color: var(--muted2); min-width: 140px; flex-shrink: 0; }
+    .sec-val { color: var(--text); font-weight: 500; }
+
+    /* Command reference */
+    .cmd-ref { display: flex; flex-direction: column; gap: 6px; }
+
+    .cmd-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      background: var(--panel2);
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      font-size: 11px;
+      transition: border-color 0.18s;
+    }
+
+    .cmd-line:hover { border-color: var(--border2); }
+
+    .cmd-code { color: var(--green); flex: 1; }
+    .cmd-desc { color: var(--muted); font-size: 10px; }
+
+    /* File structure */
+    .file-tree {
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 24px;
+      font-size: 12px;
+      line-height: 2;
+    }
+
+    .ft-dir  { color: var(--blue); }
+    .ft-file { color: var(--text); }
+    .ft-desc { color: var(--muted); }
+
+    /* Stack pills */
+    .stack { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .pill {
+      background: var(--panel2);
+      border: 1px solid var(--border2);
+      border-radius: 999px;
+      padding: 4px 14px;
+      font-size: 11px;
+      color: var(--muted2);
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .footer-left { font-size: 11px; color: var(--muted); }
+    .footer-right { display: flex; gap: 10px; }
+
+    .gh-btn {
+      background: var(--panel);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      padding: 7px 16px;
+      font-family: var(--font);
+      font-size: 11px;
+      color: var(--text);
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.18s;
+    }
+
+    .gh-btn:hover { border-color: var(--green); color: var(--green); }
+    .gh-btn.primary { background: var(--green); color: #000; border-color: var(--green); font-weight: 700; }
+    .gh-btn.primary:hover { background: #00FF9C; }
+
+    /* ── ANIMATIONS ── */
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    @keyframes breathe { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(20px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    .shell > * { animation: fadeUp 0.5s ease forwards; }
+    .shell > *:nth-child(1) { animation-delay: 0.05s; opacity:0; }
+    .shell > *:nth-child(2) { animation-delay: 0.15s; opacity:0; }
+    .shell > *:nth-child(3) { animation-delay: 0.22s; opacity:0; }
+    .shell > *:nth-child(4) { animation-delay: 0.28s; opacity:0; }
+    .shell > *:nth-child(5) { animation-delay: 0.34s; opacity:0; }
+    .shell > *:nth-child(6) { animation-delay: 0.40s; opacity:0; }
+  </style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div>
+      <div class="day-chip">Day 05 · Week 1 · CLI &amp; Developer Tools</div>
+      <h1>API KEY<br><span>VAULT</span></h1>
+      <p class="hero-desc">
+        An encrypted local CLI vault for storing, retrieving, and managing API keys by project — with AES-256-GCM encryption, PBKDF2 key derivation, and zero cloud dependency.
+      </p>
+      <div class="stack">
+        <span class="pill">Python 3.8+</span>
+        <span class="pill">cryptography</span>
+        <span class="pill">SQLite</span>
+        <span class="pill">AES-256-GCM</span>
+        <span class="pill">PBKDF2-HMAC-SHA256</span>
+      </div>
+    </div>
+    <div class="sec-badge">
+      <span class="lock-icon">🔐</span>
+      <div class="sec-title">AES-256</div>
+      <div class="sec-sub">GCM · ENCRYPTED</div>
+    </div>
+  </div>
+
+  <!-- TERMINAL -->
+  <div class="section-label">Interactive Demo</div>
+
+  <div class="cmd-tabs">
+    <button class="cmd-tab active" onclick="showDemo('init')">init</button>
+    <button class="cmd-tab" onclick="showDemo('add')">add key</button>
+    <button class="cmd-tab" onclick="showDemo('get')">get key</button>
+    <button class="cmd-tab" onclick="showDemo('list')">list</button>
+    <button class="cmd-tab" onclick="showDemo('export')">export .env</button>
+    <button class="cmd-tab" onclick="showDemo('rotate')">rotate password</button>
+  </div>
+
+  <div class="terminal">
+    <div class="term-bar">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <div class="term-title">bash — api-key-vault</div>
+    </div>
+    <div class="term-body" id="termBody"></div>
+  </div>
+
+  <!-- TWO COLUMNS -->
+  <div class="two-col">
+    <!-- Security model -->
+    <div class="card">
+      <div class="card-head">Security Model</div>
+      <div class="sec-row">
+        <span class="sec-icon">🔒</span>
+        <span class="sec-key">Encryption</span>
+        <span class="sec-val">AES-256-GCM (authenticated)</span>
+      </div>
+      <div class="sec-row">
+        <span class="sec-icon">🧂</span>
+        <span class="sec-key">Key Derivation</span>
+        <span class="sec-val">PBKDF2-HMAC-SHA256</span>
+      </div>
+      <div class="sec-row">
+        <span class="sec-icon">🎲</span>
+        <span class="sec-key">Salt</span>
+        <span class="sec-val">32 bytes, random per vault</span>
+      </div>
+      <div class="sec-row">
+        <span class="sec-icon">🎯</span>
+        <span class="sec-key">Nonce</span>
+        <span class="sec-val">12 bytes, random per value</span>
+      </div>
+      <div class="sec-row">
+        <span class="sec-icon">🔁</span>
+        <span class="sec-key">Iterations</span>
+        <span class="sec-val">600,000 (NIST 2023 min)</span>
+      </div>
+      <div class="sec-row">
+        <span class="sec-icon">💾</span>
+        <span class="sec-key">Storage</span>
+        <span class="sec-val">~/.api_vault/ (chmod 600)</span>
+      </div>
+      <div class="sec-row">
+        <span class="sec-icon">🚫</span>
+        <span class="sec-key">Master password</span>
+        <span class="sec-val">Never stored. Canary only.</span>
+      </div>
+    </div>
+
+    <!-- Command reference -->
+    <div class="card">
+      <div class="card-head">Command Reference</div>
+      <div class="cmd-ref">
+        <div class="cmd-line"><span class="cmd-code">vault.py init</span><span class="cmd-desc">Set up vault</span></div>
+        <div class="cmd-line"><span class="cmd-code">vault.py add &lt;proj&gt; &lt;key&gt;</span><span class="cmd-desc">Store a secret</span></div>
+        <div class="cmd-line"><span class="cmd-code">vault.py get &lt;proj&gt; &lt;key&gt;</span><span class="cmd-desc">Retrieve a secret</span></div>
+        <div class="cmd-line"><span class="cmd-code">vault.py list</span><span class="cmd-desc">All projects</span></div>
+        <div class="cmd-line"><span class="cmd-code">vault.py list &lt;proj&gt;</span><span class="cmd-desc">Keys in project</span></div>
+        <div class="cmd-line"><span class="cmd-code">vault.py delete &lt;proj&gt; &lt;key&gt;</span><span class="cmd-desc">Remove a key</span></div>
+        <div class="cmd-line"><span class="cmd-code">vault.py nuke &lt;proj&gt;</span><span class="cmd-desc">Delete project</span></div>
+        <div class="cmd-line"><span class="cmd-code">vault.py export &lt;proj&gt;</span><span class="cmd-desc">Write .env file</span></div>
+        <div class="cmd-line"><span class="cmd-code">vault.py change-password</span><span class="cmd-desc">Rotate master key</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- File structure -->
+  <div class="section-label">Vault File Structure</div>
+  <div class="file-tree">
+    <div><span class="ft-dir">~/</span></div>
+    <div>&nbsp;&nbsp;<span class="ft-dir">.api_vault/</span> &nbsp;<span class="ft-desc"># created by `vault.py init` (chmod 700)</span></div>
+    <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ft-file">vault.db</span> &nbsp;&nbsp;&nbsp;<span class="ft-desc"># encrypted SQLite — all your secrets (chmod 600)</span></div>
+    <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ft-file">meta.json</span> &nbsp;&nbsp;<span class="ft-desc"># salt + canary for password verification (chmod 600)</span></div>
+    <div>&nbsp;</div>
+    <div><span class="ft-dir">api-key-vault/</span> &nbsp;<span class="ft-desc"># your GitHub repo</span></div>
+    <div>&nbsp;&nbsp;<span class="ft-file">vault.py</span> &nbsp;&nbsp;&nbsp;&nbsp;<span class="ft-desc"># the CLI tool</span></div>
+    <div>&nbsp;&nbsp;<span class="ft-file">README.md</span> &nbsp;&nbsp;&nbsp;<span class="ft-desc"># docs</span></div>
+    <div>&nbsp;&nbsp;<span class="ft-file">requirements.txt</span> <span class="ft-desc"># cryptography>=41.0.0</span></div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-left">
+      Day 5 / 30 · 30-Day GitHub Roadmap · <span style="color: var(--green)">Week 1: CLI &amp; Developer Tools</span>
+    </div>
+    <div class="footer-right">
+      <a class="gh-btn" href="#">⭐ Star on GitHub</a>
+      <a class="gh-btn primary" href="#">↓ Download vault.py</a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const demos = {
+    init: [
+      { t:'prompt', v:'python vault.py init' },
+      { t:'blank' },
+      { t:'out',    v:'╔══════════════════════════════════════╗' },
+      { t:'out',    v:'║        API KEY VAULT  v1.0           ║' },
+      { t:'out',    v:'╚══════════════════════════════════════╝' },
+      { t:'blank' },
+      { t:'out',    v:'  Choose a strong master password (it will never be stored).' },
+      { t:'out',    v:'  🔑 New master password: ••••••••••••' },
+      { t:'out',    v:'  🔑 Confirm password:    ••••••••••••' },
+      { t:'blank' },
+      { t:'ok',     v:'  ✓  Vault initialized successfully!' },
+      { t:'out',    v:'  →  Vault location: /Users/you/.api_vault' },
+    ],
+    add: [
+      { t:'prompt', v:'python vault.py add myapp OPENAI_API_KEY' },
+      { t:'blank' },
+      { t:'out',    v:'  🔑 Master password: ••••••••••••' },
+      { t:'out',    v:'  Value for myapp/OPENAI_API_KEY: ••••••••••••••••••••••••••' },
+      { t:'blank' },
+      { t:'ok',     v:'  ✓  Saved myapp/OPENAI_API_KEY' },
+      { t:'blank' },
+      { t:'prompt', v:'python vault.py add myapp STRIPE_SECRET_KEY' },
+      { t:'blank' },
+      { t:'out',    v:'  🔑 Master password: ••••••••••••' },
+      { t:'out',    v:'  Value for myapp/STRIPE_SECRET_KEY: ••••••••••••••••••••••' },
+      { t:'blank' },
+      { t:'ok',     v:'  ✓  Saved myapp/STRIPE_SECRET_KEY' },
+    ],
+    get: [
+      { t:'prompt', v:'python vault.py get myapp OPENAI_API_KEY' },
+      { t:'blank' },
+      { t:'out',    v:'  🔑 Master password: ••••••••••••' },
+      { t:'blank' },
+      { t:'out',    v:'  Project:   myapp' },
+      { t:'key',    v:'  Key:       OPENAI_API_KEY' },
+      { t:'val',    v:'  Value:     sk-proj-aB3xK9mN2pQr7sT4uV8wY1zD6eF0gH5jL...' },
+      { t:'dim',    v:'  Updated:   2024-01-15 09:42' },
+    ],
+    list: [
+      { t:'prompt', v:'python vault.py list' },
+      { t:'blank' },
+      { t:'out',    v:'  PROJECT                   KEYS  LAST UPDATED' },
+      { t:'out',    v:'  ──────────────────────────────────────────────' },
+      { t:'key',    v:'  myapp                        2  2024-01-15 09:42' },
+      { t:'key',    v:'  portfolio-site               3  2024-01-14 16:20' },
+      { t:'key',    v:'  discord-bot                  1  2024-01-10 11:05' },
+      { t:'blank' },
+      { t:'prompt', v:'python vault.py list myapp' },
+      { t:'blank' },
+      { t:'key',    v:'  myapp' },
+      { t:'blank' },
+      { t:'ok',     v:'    •  OPENAI_API_KEY               2024-01-15 09:42' },
+      { t:'ok',     v:'    •  STRIPE_SECRET_KEY            2024-01-15 09:44' },
+    ],
+    export: [
+      { t:'prompt', v:'python vault.py export myapp' },
+      { t:'blank' },
+      { t:'out',    v:'  🔑 Master password: ••••••••••••' },
+      { t:'blank' },
+      { t:'ok',     v:'  ✓  Exported to myapp.env (2 keys)' },
+      { t:'warn',   v:'  !  Add this file to .gitignore immediately!' },
+      { t:'blank' },
+      { t:'prompt', v:'cat myapp.env' },
+      { t:'blank' },
+      { t:'dim',    v:'  # myapp — exported from API Key Vault on 2024-01-15 09:50' },
+      { t:'val',    v:'  OPENAI_API_KEY=sk-proj-aB3xK9mN2pQr...' },
+      { t:'val',    v:'  STRIPE_SECRET_KEY=sk_live_51PqRsT...' },
+    ],
+    rotate: [
+      { t:'prompt', v:'python vault.py change-password' },
+      { t:'blank' },
+      { t:'out',    v:'  🔑 Master password: ••••••••••••' },
+      { t:'blank' },
+      { t:'out',    v:'  Choose a new master password.' },
+      { t:'out',    v:'  New master password: ••••••••••••••••' },
+      { t:'out',    v:'  Confirm:             ••••••••••••••••' },
+      { t:'blank' },
+      { t:'ok',     v:'  ✓  Password changed. 5 key(s) re-encrypted.' },
+    ],
+  };
+
+  const colorMap = {
+    prompt: 't-prompt',
+    out:    't-out',
+    ok:     't-ok',
+    warn:   't-warn',
+    err:    't-err',
+    key:    't-key',
+    val:    't-val',
+    dim:    't-dim',
+    blank:  't-blank',
+  };
+
+  function showDemo(name) {
+    // Update active tab
+    document.querySelectorAll('.cmd-tab').forEach(b => {
+      b.classList.toggle('active', b.textContent.trim() === {
+        init:'init', add:'add key', get:'get key',
+        list:'list', export:'export .env', rotate:'rotate password'
+      }[name]);
+    });
+
+    const lines = demos[name];
+    const body = document.getElementById('termBody');
+    body.innerHTML = '';
+
+    lines.forEach((line, i) => {
+      const div = document.createElement('div');
+      div.className = colorMap[line.t] || 't-out';
+      div.style.opacity = '0';
+      div.style.transition = 'opacity 0.15s ease';
+      if (line.t === 'blank') {
+        div.innerHTML = '&nbsp;';
+      } else {
+        div.textContent = line.v;
+      }
+      body.appendChild(div);
+      setTimeout(() => { div.style.opacity = '1'; }, i * 60);
+    });
+
+    // Add cursor
+    setTimeout(() => {
+      const cur = document.createElement('span');
+      cur.className = 'cursor';
+      body.appendChild(cur);
+    }, lines.length * 60 + 80);
+  }
+
+  showDemo('init');
+</script>
+</body>
+</html>
