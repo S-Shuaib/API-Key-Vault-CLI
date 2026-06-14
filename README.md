@@ -10,7 +10,7 @@
 
 ## Why?
 
-You have 40 projects. Each has an OpenAI key, a Stripe key, a database URL. You keep them in a `.txt` file on your Desktop. That file is not encrypted. This fixes that.
+You have 40 projects. Each has an OpenAI key, a Stripe key, and a database URL. You keep them in a .txt file on your Desktop. That file is not encrypted. This fixes that.
 
 API Key Vault stores all your secrets **locally**, **encrypted with AES-256-GCM**, behind a single master password. Nothing is ever sent to the cloud.
 
@@ -119,7 +119,7 @@ python vault.py change-password
 - **Back up `~/.api_vault/`** — if you lose it, keys are gone forever
 - The master password is **never recoverable** — choose wisely
 - Exported `.env` files are **plaintext** — treat them like passwords
-- Add `*.env` to your global `.gitignore`
+- Add `*.env` to your global `.gitignore.`
 
 ---
 
